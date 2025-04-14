@@ -22,112 +22,7 @@ object3@meta.data$sample <- "virgin1"
 ImageDimPlot(object3)
 ```
 
-
-```{R}
-# Repeat for a few others (e.g. preg1-3 + virgin1-3)
-# Merge and run standard workflow
-combined <- merge(object1, y = list(object2, object3), add.cell.ids = c("preg1", "preg2", "virgin1"), project = "combined")
-combined$sample <- sapply(strsplit(colnames(combined), "_"), `[`, 1)
-
-combined <- NormalizeData(combined)
-combined <- FindVariableFeatures(combined)
-combined <- ScaleData(combined)
-combined <- RunPCA(combined)
-combined <- RunUMAP(combined, dims = 1:20)
-```
-
-```{r}
-DimPlot(combined, reduction='umap', group.by = "sample") +
-  ggtitle("UMAP before Harmony")
-```
-```{r}
-combined_har <- RunHarmony(combined, group.by.vars = "sample")
-Embeddings(combined_har, "harmony")
-combined <- RunUMAP(combined_har, reduction = "harmony", dims = 1:20)
-DimPlot(combined_har, group.by = "sample") +
-  ggtitle("UMAP after Harmony")
-
-```
-
-Two-sample example:
-```{r}
-library(Seurat)
-library(harmony)
-library(ggplot2)
-
-# Load two samples
-s1 <- readRDS("./data/preg1_cortex.rds")
-s2 <- readRDS("./data/virgin1_cortex.rds")
-
-# Assign sample names
-s1$orig.ident <- "preg1"
-s2$orig.ident <- "virgin1"
-
-# Normalize and identify variable features using SCTransform
-s1 <- SCTransform(s1, verbose = FALSE)
-s2 <- SCTransform(s2, verbose = FALSE)
-
-# Prepare for integration
-samples <- list(s1, s2)
-features <- SelectIntegrationFeatures(samples, nfeatures = 3000)
-samples <- PrepSCTIntegration(samples, anchor.features = features)
-
-# Merge two samples
-merged <- merge(samples[[1]], samples[[2]], add.cell.ids = c("preg1", "virgin1"))
-
-# Run PCA and Harmony
-merged <- RunPCA(merged, assay = "SCT", features = features)
-merged$batch <- merged$orig.ident
-merged <- RunHarmony(merged, group.by.vars = "batch", assay.use = "SCT", reduction = "pca")
-
-# UMAP and clustering
-merged <- RunUMAP(merged, reduction = "harmony", dims = 1:30)
-merged <- FindNeighbors(merged, reduction = "harmony", dims = 1:30)
-merged <- FindClusters(merged, resolution = 0.5)
-
-# Visualization
-DimPlot(merged, reduction = "umap", group.by = "orig.ident") + ggtitle("UMAP: preg1 vs virgin1")
-DimPlot(merged, reduction = "umap", group.by = "seurat_clusters", label = TRUE) + ggtitle("Clusters")
-
-```
-
-The real stuff:
-```{r}
-library(Seurat)
-library(harmony)
-library(ggplot2)
-library(patchwork)
-
-sample_files <- c(
-  "preg1_cortex.rds", "preg2_cortex.rds", "preg3_cortex.rds",
-  "preg4_cortex.rds", "preg5_cortex.rds", "preg6_cortex.rds",
-  "virgin1_cortex.rds", "virgin2_cortex.rds", "virgin3_cortex.rds",
-  "virgin4_cortex.rds", "virgin5_cortex.rds", "virgin6_cortex.rds"
-)
-sample_files <- c(
-  "preg1_cortex.rds", "preg2_cortex.rds", "virgin5_cortex.rds", "virgin6_cortex.rds"
-)
-file_paths <- file.path("./data", sample_files)
-
-sample_list <- lapply(file_paths, readRDS)
-
-names(sample_list) <- c(paste0("preg", 1:6), paste0("virgin", 1:6))
-
-merged <- merge(sample_list[[1]], sample_list[-1], add.cell.ids = names(sample_list))
-
-merged <- RunPCA(merged, assay = "SCT", features = features)
-merged$batch <- merged$orig.ident
-merged <- RunHarmony(merged, group.by.vars = "batch", assay.use = "SCT", reduction = "pca")
-
-# Step 6: UMAP, clustering, and neighbors
-merged <- RunUMAP(merged, reduction = "harmony", dims = 1:30)
-merged <- FindNeighbors(merged, reduction = "harmony", dims = 1:30)
-merged <- FindClusters(merged, resolution = 0.5)
-
-```
-
-
-four samples example:
+Four samples example:
 ```{r}
 library(Seurat)
 library(harmony)
@@ -186,6 +81,7 @@ p2 <- DimPlot(merged, reduction = "umap.harmony", group.by = "sample") + ggtitle
 p1+p2
 ggsave("img/harmony_result_4_sample.png", width = 14, height = 6)
 ```
+
 ```{R}
 # clustering on merged data
 merged <- FindNeighbors(merged, reduction = "harmony", dims = 1:30)
