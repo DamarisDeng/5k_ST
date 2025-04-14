@@ -172,3 +172,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# R related
+*.Rproj
+
+# big files / folders
+data/
