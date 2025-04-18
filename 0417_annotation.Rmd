@@ -1,0 +1,64 @@
+---
+title: "0417_annotation"
+output: html_document
+---
+
+```{r}
+# check what's inside obj prior to merging
+s <- readRDS("data/preg2_cortex.rds")
+class(s)
+packageVersion("SeuratObject")
+Layers(s[["RNA"]])
+
+```
+Do cell annotation:
+```{r}
+# Install required packages
+if (!requireNamespace("SingleR", quietly = TRUE)) BiocManager::install("SingleR")
+if (!requireNamespace("celldex", quietly = TRUE)) BiocManager::install("celldex")
+
+library(SingleR)
+library(celldex)
+library(Seurat)
+
+# Load mouse RNA-seq reference
+ref <- celldex::MouseRNAseqData()
+
+
+# Normalize your merged Seurat object if not already done
+merged <- readRDS("data/merged_harmony_20percent.rds")
+merged <- JoinLayers(merged)
+
+merged <- NormalizeData(merged)
+merged <- FindVariableFeatures(merged)
+
+# Use log-normalized data for prediction
+test_expr <- GetAssayData(merged, assay = "RNA", layer = "scale.data")
+
+# Run SingleR
+pred <- SingleR(test = test_expr, ref = ref, labels = ref$label.main)
+
+# Add predicted labels to metadata
+merged$SingleR_label <- pred$labels
+
+# Visualize the result
+DimPlot(merged, group.by = "SingleR_label", repel = TRUE) + ggtitle("Mouse Cell Type Annotation (SingleR)")
+DimPlot(merged, group.by = "sample", repel = TRUE) + ggtitle("Sample Annotation")
+```
+
+```{R}
+ImageDimPlot(merged, group.by = "SingleR_label") + 
+  ggtitle("Mouse Cell Type Annotation (SingleR)")
+```
+
+```{R}
+# export
+counts_mat <- GetAssayData(merged, layer = "counts")  # assuming confirmed it's raw counts
+
+# Convert to full matrix if sparse
+counts_df <- as.data.frame(as.matrix(counts_mat))
+
+# Export to CSV
+write.csv(counts_df, file = "data/merged_raw_counts.csv")
+
+```

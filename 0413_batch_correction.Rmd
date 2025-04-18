@@ -22,7 +22,7 @@ object3@meta.data$sample <- "virgin1"
 ImageDimPlot(object3)
 ```
 
-Four samples example:
+Tw0 samples example:
 ```{r}
 library(Seurat)
 library(harmony)
@@ -37,7 +37,7 @@ sample_files <- c(
 )
 
 sample_files <- c(
-  "preg1_cortex.rds", "preg2_cortex.rds", "virgin5_cortex.rds", "virgin6_cortex.rds"
+  "preg1_cortex.rds", "virgin5_cortex.rds", 
 )
 file_paths <- file.path("./data", sample_files)
 
@@ -46,6 +46,7 @@ sample_list <- lapply(file_paths, readRDS)
 
 # add names to items in list
 names(sample_list) <- c(paste0("preg", 1:2), paste0("virgin", 1:2))
+names(sample_list) <- c("preg1", "virgin5")
 
 # add a "sample" column for all samples
 sample_list <- Map(function(obj, name) {
@@ -62,8 +63,6 @@ merged$sample <- as.factor(merged$sample)
 
 # rescale the merged data
 merged <- ScaleData(merged, assay = "RNA")
-merged <- RunUMAP(merged, reduction = "pca", dims = 1:30, reduction.name = "umap.pca")
-
 # run pca
 merged <- RunPCA(merged, assay = "RNA")
 
@@ -74,12 +73,16 @@ merged <- RunHarmony(merged, "sample")
 merged <- RunUMAP(merged, reduction = "harmony", dims = 1:30, reduction.name = "umap.harmony")
 
 # Plot pre-Harmony UMAP
-p1 <- DimPlot(merged, reduction = "umap.pca", group.by = "sample") + ggtitle("Before Harmony")
+p1 <- DimPlot(merged, reduction = "umap.pca", group.by = "sample") + 
+  ggtitle("Before Harmony") +
+  scale_alpha_manual(values = 0.1)
 
 # Plot post-Harmony UMAP
-p2 <- DimPlot(merged, reduction = "umap.harmony", group.by = "sample") + ggtitle("After Harmony")
+p2 <- DimPlot(merged, reduction = "umap.harmony", group.by = "sample") + 
+  ggtitle("After Harmony") + 
+  scale_alpha_manual(values = 0.1)
 p1+p2
-ggsave("img/harmony_result_4_sample.png", width = 14, height = 6)
+ggsave("img/harmony_result_2_sample.png", width = 14, height = 6)
 ```
 
 ```{R}
@@ -92,4 +95,38 @@ p1 <- DimPlot(merged, reduction = "umap.harmony", group.by = "RNA_snn_res.0.5")
 p2 <- ImageDimPlot(merged, group.by="RNA_snn_res.0.5")
 p1 + p2
 ggsave("img/clustering.png", width=14, height=6)
+```
+
+Do cell annotation:
+```{r}
+# Install required packages
+if (!requireNamespace("SingleR", quietly = TRUE)) BiocManager::install("SingleR")
+if (!requireNamespace("celldex", quietly = TRUE)) BiocManager::install("celldex")
+
+library(SingleR)
+library(celldex)
+
+# Load mouse RNA-seq reference
+ref <- celldex::MouseRNAseqData()
+
+# Normalize your merged Seurat object if not already done
+merged <- NormalizeData(merged)
+merged <- FindVariableFeatures(merged)
+
+# Use log-normalized data for prediction
+test_expr <- GetAssayData(merged, assay = "RNA", layer = "scale.data")
+
+# Run SingleR
+pred <- SingleR(test = test_expr, ref = ref, labels = ref$label.main)
+
+# Add predicted labels to metadata
+merged$SingleR_label <- pred$labels
+
+# Visualize the result
+DimPlot(merged, group.by = "SingleR_label", repel = TRUE) + ggtitle("Mouse Cell Type Annotation (SingleR)")
+DimPlot(merged, group.by = "sample", repel = TRUE) + ggtitle("Sample Annotation")
+```
+```{R}
+ImageDimPlot(merged, group.by = "SingleR_label") + 
+  ggtitle("Mouse Cell Type Annotation (SingleR)")
 ```
